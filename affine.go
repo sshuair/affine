@@ -4,6 +4,7 @@ import (
 	"math"
 )
 
+// calcuate the cos and sin degree value
 func cosSinDeg(deg float64) (float64, float64) {
 	deg = math.Mod(deg, 360.0)
 	switch deg {
@@ -33,7 +34,7 @@ type Affine struct {
 // | x' |   | 1  0  0 | | x |
 // | y' | = | 0  1  0 | | y |
 // | 1  |   | 0  0  1 | | 1 |
-func (aff Affine) Identity() Affine {
+func Identity() Affine {
 	newAff := Affine{
 		1.0, 0.0, 0.0,
 		0.0, 1.0, 0.0,
@@ -45,7 +46,7 @@ func (aff Affine) Identity() Affine {
 // | x' |   | 1  0  xoff | | x |
 // | y' | = | 0  1  yoff | | y |
 // | 1  |   | 0  0  1    | | 1 |
-func (aff Affine) Translation(xoff float64, yoff float64) Affine {
+func Translation(xoff float64, yoff float64) Affine {
 	newAff := Affine{
 		1, 0, xoff,
 		0, 1, yoff,
@@ -57,7 +58,7 @@ func (aff Affine) Translation(xoff float64, yoff float64) Affine {
 // | x' |   | scale  0  1 | | x |
 // | y' | = | 0  scale  1 | | y |
 // | 1  |   | 0      0  1 | | 1 |
-func (aff Affine) Scale(scaling float64) Affine {
+func Scale(scaling float64) Affine {
 	newAff := Affine{
 		scaling, 0, 0,
 		0, scaling, 0,
@@ -69,7 +70,7 @@ func (aff Affine) Scale(scaling float64) Affine {
 // | x' |   | c   s  1 | | x |
 // | y' | = | -s  c  1 | | y |
 // | 1  |   | 0   0  1 | | 1 |
-func (aff Affine) Rotation(angle float64, pivot [2]float64) Affine {
+func Rotation(angle float64, pivot [2]float64) Affine {
 	ca, sa := cosSinDeg(angle)
 	px, py := pivot[0], pivot[1]
 	newAff := Affine{
@@ -77,6 +78,21 @@ func (aff Affine) Rotation(angle float64, pivot [2]float64) Affine {
 		sa, ca, py - px*sa - py*ca,
 	}
 	return newAff
+}
+
+// calcuate the transformed affine with another transform
+// | a"  b"  c" |   | a  b  c | | a'  b'  c' |
+// | d"  e"  f" | = | d  e  f | | d'  e'  f' |
+// | 0   0   1  |   | 0  0  1 | | 0   0   1  |
+func (aff *Affine) Mul(affOther Affine) {
+	sa, sb, sc, sd, se, sf := aff.A, aff.B, aff.C, aff.D, aff.E, aff.F
+	oa, ob, oc, od, oe, of := affOther.A, affOther.B, affOther.C, affOther.D, affOther.E, affOther.F
+	aff.A = sa*oa + sb*od
+	aff.B = sa*ob + sb*oe
+	aff.C = sa*oc + sb*of + sc
+	aff.D = sd*oa + se*od
+	aff.E = sd*ob + se*oe
+	aff.F = sd*oc + se*of + sf
 }
 
 // get the affine params from gdal
@@ -102,7 +118,7 @@ func (aff Affine) ToGdal() [6]float64 {
 }
 
 // get the x,y from the pixel row,col
-func (aff Affine) XY(row int, col int) (float64, float64) {
+func (aff Affine) XY(col int, row int) (float64, float64) {
 	var x, y float64
 	x = aff.A*float64(col) + aff.C
 	y = aff.E*float64(row) + aff.F
@@ -111,9 +127,8 @@ func (aff Affine) XY(row int, col int) (float64, float64) {
 
 // convert the spatial reference system x,y to row,col
 // note the x corspand to col, and y corespond to row
-func (aff Affine) RowCol(x float64, y float64) (int, int) {
-	var row, col int
-	row = int(math.Floor((x - aff.C) / aff.A))
-	col = int(math.Floor((y - aff.F) / aff.E))
-	return row, col
+func (aff Affine) ColRow(x float64, y float64) (int, int) {
+	col := int(math.Floor((x - aff.C) / aff.A))
+	row := int(math.Floor((y - aff.F) / aff.E))
+	return col, row
 }
